@@ -30,7 +30,7 @@ private:
 	std::map<Dir, olc::vi2d> SnakeHead, SnakeTail;
 	olc::vi2d Apple;
 
-	Dir dir, new_dir;
+	Dir dir, hold_dir, new_dir;
 	float frameTime, frameCounter;
 	uint32_t score;
 
@@ -42,15 +42,8 @@ private:
 
 	void DrawSnake() {
 		Dir d1, d2;
-		// Drawing Head
-		olc::vi2d temp = SnakeCords[1] - SnakeCords[0];
-		if (temp == olc::vi2d{ 0,1 }) d1 = Up; // Up
-		else if (temp == olc::vi2d{ 0,-1 }) d1 = Down; // Down
-		else if (temp == olc::vi2d{ 1,0 }) d1 = Left; // Left
-		else if (temp == olc::vi2d{ -1,0 }) d1 = Right; // Right
-		else assert(false && "Gap Between Head and Body");
-		DrawPartialDecal(GridCellSize * SnakeCords[0], GridCellSize, dFullTex, SnakeHead[d1], { 64,64 });
-
+		
+		olc::vi2d temp;
 		// DrawingBody
 		for (uint32_t i = 1; i < SnakeCords.size() - 1; i++) {
 			
@@ -71,6 +64,7 @@ private:
 			if (GetKey(olc::SPACE).bHeld) std::cout << "dir of part " << i << ", is: " << d1 << ", " << d2 << '\n';
 			DrawPartialDecal(GridCellSize * SnakeCords[i], GridCellSize, dFullTex, SnakeBody[d1][d2], { 64,64 });
 		}
+
 		// Drawing Head
 		temp = SnakeCords[SnakeCords.size() - 1] - SnakeCords[SnakeCords.size() - 2];
 		if (temp == olc::vi2d{ 0,1 }) d1 = Up; // Up
@@ -79,6 +73,15 @@ private:
 		else if (temp == olc::vi2d{ 1,0 }) d1 = Right; // Right
 		else assert(false && "Gap Between Body and Tail");
 		DrawPartialDecal(GridCellSize * SnakeCords.back(), GridCellSize, dFullTex, SnakeTail[d1], { 64,64 });
+
+		// Drawing Head
+		temp = SnakeCords[1] - SnakeCords[0];
+		if (temp == olc::vi2d{ 0,1 }) d1 = Up; // Up
+		else if (temp == olc::vi2d{ 0,-1 }) d1 = Down; // Down
+		else if (temp == olc::vi2d{ 1,0 }) d1 = Left; // Left
+		else if (temp == olc::vi2d{ -1,0 }) d1 = Right; // Right
+		else assert(false && "Gap Between Head and Body");
+		DrawPartialDecal(GridCellSize * SnakeCords[0], GridCellSize, dFullTex, SnakeHead[d1], { 64,64 });
 	}
 
 	void DrawApple() {
@@ -112,7 +115,7 @@ protected:
 
 		Apple = olc::vi2d{ 0, 3 } *64;
 #pragma endregion
-
+		newApple();
 		GridCellSize = { ScreenWidth() / GridSize.x, ScreenHeight() / GridSize.y };
 		GridCellSize = { min(GridCellSize), min(GridCellSize) }; // making sure the Grid is square 
 																 //(I'm not using regilar uint32_t so it would be easier coding later)
@@ -124,6 +127,7 @@ protected:
 			MidGrid + olc::vi2d{0,2} };
 
 		dir = Up;
+		hold_dir = Up;
 		new_dir = Up;
 
 		frameTime = 0.25f;
@@ -146,7 +150,8 @@ protected:
 		Clear(olc::BLACK);
 		DrawSnake();
 		DrawApple();
-
+		// Making sure you can't press down after up (making the snake collide into his neck)
+		if ((new_dir + 2) % 4 != dir) hold_dir = new_dir;
 		// Making it choppy
 		frameCounter += elapsedTime;
 		if (frameCounter >= frameTime) {
@@ -156,8 +161,20 @@ protected:
 		}
 		else return true;
 
-		// Making sure you can't press down after up (making the snake collide into his neck)
-		if ((new_dir + 2) % 4 != dir) dir = new_dir;
+		dir = hold_dir;
+		
+		// check hit self
+		if (is_in(SnakeCords, SnakeCords[0], 1)) {
+			std::cout << "You hit yourself!\nFinished with score: " << score << '\n';
+			return false;
+		}
+
+		// check hit edges
+		if (SnakeCords[0].x < 0 || SnakeCords[0].x >= GridSize.x ||
+			SnakeCords[0].y < 0 || SnakeCords[0].y >= GridSize.y) {
+			std::cout << "You hit the edge!\nFinished with score: " << score << '\n';
+			return false;
+		}
 
 		switch (dir) {
 		case Up:
@@ -181,18 +198,7 @@ protected:
 		}
 		else SnakeCords.pop_back();
 
-		// check hit self
-		if (is_in(SnakeCords, SnakeCords[0], 1)) {
-			std::cout << "You hit yourself!\nFinished with score: " << score << '\n';
-			return false;
-		}
-
-		// check hit edges
-		if (SnakeCords[0].x < 0 || SnakeCords[0].x >= GridSize.x ||
-		    SnakeCords[0].y < 0 || SnakeCords[0].y >= GridSize.y) {
-			std::cout << "You hit the edge!\nFinished with score: " << score << '\n';
-			return false;
-		}
+		
 
 		return true;
 	}
@@ -200,7 +206,7 @@ protected:
 
 int main() {
 	Snake demo;
-	if (demo.Construct(256, 240, 4, 4))
+	if (demo.Construct(256, 240, 4, 4, false, true))
 		demo.Start();
 	return 0;
 }
